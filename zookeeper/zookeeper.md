@@ -71,6 +71,70 @@ Zookeepr提供文件系统及通知机制。
  系统模型如图：
  
  ![](./4.png)
+ ####5.2设计目的
+ （1）一致性：client不论连接到哪个Server，展示给它都是同一个视图，这是zookeeper最重要的性能
  
+ （2）可靠性：具有简单、健壮、良好的性能，如果消息m被到一台服务器接受，那么它将被所有的服务器接受。
  
-https://blog.csdn.net/wzk646795873/article/details/79706627
+ （3）实时性：Zookeeper保证客户端将在一个时间间隔范围内获得服务器的更新信息，或者服务器失效的信息。但由于网络延时等原因，Zookeeper不能保证两个客户端能同时得到刚更新的数据，如果需要最新数据，应该在读数据之前调用sync()接口
+ 
+ （4）等待无关（wait-free）：慢的或者失效的client不得干预快速的client的请求，使得每个client都能有效的等待。
+ 
+ （5）原子性：更新只能成功或者失败，没有中间状态。
+ 
+ （6）顺序性：包括全局有序和偏序两种：全局有序是指如果在一台服务器上消息a在消息b前发布，则在所有Server上消息a都将在消息b前被发布；偏序是指如果一个消息b在消息a后被同一个发送者发布，a必将排在b前面。
+
+###6、Zookeepr工作原理
+Zookeeper的核心是原子广播，这个机制保证了各个Server之间的同步。实现这个机制的协议叫做Zab协议。Zab协议有两种模式，它们分别是恢复模式（选主）和广播模式（同步）。当服务启动或者在领导者崩溃后，Zab就进入了恢复模式，当领导者被选举出来，且大多数Server完成了和 leader的状态同步以后，恢复模式就结束了。状态同步保证了leader和Server具有相同的系统状态
+
+为了保证事务的顺序一致性，zookeeper采用了递增的事务id号（zxid）来标识事务。所有的提议（proposal）都在被提出的时候加上 了zxid。实现中zxid是一个64位的数字，它高32位是epoch用来标识leader关系是否改变，每次一个leader被选出来，它都会有一个 新的epoch，标识当前属于那个leader的统治时期。低32位用于递增计数。
+  
+每个Server在工作过程中有三种状态：  
+
+  （1）LOOKING：当前Server不知道leader是谁，正在搜寻。
+  
+  （2）LEADING：当前Server即为选举出来的leader。
+  
+  （3）FOLLOWING：leader已经选举出来，当前Server与之同步。
+####6.1选主流程
+
+  当leader崩溃或者leader失去大多数的follower，这时候zk进入恢复模式，恢复模式需要重新选举出一个新的leader，让所有的 Server都恢复到一个正确的状态。Zk的选举算法有两种：一种是基于basic paxos实现的，另外一种是基于fast paxos算法实现的。系统默认的选举算法为fast paxos。先介绍basic paxos流程：
+ 
+  Basic paxos：当前Server发起选举的线程,向所有Server发起询问,选举线程收到所有回复,计算zxid最大Server,并推荐此为leader，若此提议获得n/2+1票通过,此为leader，否则重复上述流程，直到leader选出。
+ 
+  Fast paxos:某Server首先向所有Server提议自己要成为leader，当其它Server收到提议以后，解决epoch和 zxid的冲突，并接受对方的提议，然后向对方发送接受提议完成的消息，重复这个流程，最后一定能选举出Leader。(即提议方解决其他所有epoch和 zxid的冲突,即为leader)。
+ 
+####6.2同步流程 
+ （1）Leader等待server连接；
+ 
+ （2）Follower连接leader，将最大的zxid发送给leader；
+ 
+ （3）Leader根据follower的zxid确定同步点，完成同步后通知follower 已经成为uptodate状态；
+ 
+ （4）Follower收到uptodate消息后，又可以重新接受client的请求进行服务了。
+
+![](./5.png) 
+ 
+ ####6.3主要功能（server）
+
+ （1）Leader主要功能：①恢复数据②维持与Learner的心跳，接收Learner请求并判断Learner的请求消息类型；③Learner的消息类型主要有PING消息、REQUEST消息、ACK消息、REVALIDATE消息，根据不同的消息类型，进行不同的处理。
+ 
+  PING消息是指Learner的心跳信息；REQUEST消息是Follower发送的提议信息，包括写请求及同步请求；ACK消息是 Follower的对提议的回复，超过半数的Follower通过，则commit该提议；REVALIDATE消息是用来延长SESSION有效时间。
+ 
+ （2）Follower主要功能：①向Leader发送请求（PING消息、REQUEST消息、ACK消息、REVALIDATE消息）；②接收Leader消息并进行处理；③接收Client的请求，如果为写请求，发送给Leader进行投票；④返回Client结果。
+ 
+###7、Zookeeper应用场景 
+ 
+ （1）数据发布与订阅：发布与订阅即所谓的配置管理，顾名思义就是将数据发布到zk节点上，供订阅者动态获取数据，实现配置信息的集中式管理和动态更新。例如全局的配置信息，地址列表等就非常适合使用。
+ 
+ （2）NameService：作为分布式命名服务，通过调用zk的create node api，能够很容易创建一个全局唯一的path，这个path就可以作为一个名称。
+ 
+ （3）分布通知/协调：ZooKeeper 中特有watcher注册与异步通知机制，能够很好的实现分布式环境下不同系统之间的通知与协调，实现对数据变更的实时处理。使用方法通常是不同系统都对 ZK上同一个znode进行注册，监听znode的变化（包括znode本身内容及子节点的），其中一个系统update了znode，那么另一个系统能 够收到通知，并作出相应处理。使用zookeeper来进行分布式通知和协调能够大大降低系统之间的耦合。
+
+ （4）分布式锁：主要得益于ZooKeeper为我们保证了数据的强一致性，即用户只要完全相信每时每刻，zk集群中任意节点（一个zk server）上的相同znode的数据是一定是相同的。锁服务可以分为两类，一个是保持独占，另一个是控制时序。控制时序中Zk的父节点（/distribute_lock）维持一份sequence,保证子节点创建的时序性，从而也形成了每个客户端的全局时序。
+ 
+ （5）集群管理：①集群监控：a. 客户端在节点 x 上注册一个Watcher，那么如果x的子节点变化了，会通知该客户端。b. 创建EPHEMERAL类型的节点，一旦客户端和服务器的会话结束或过期，那么该节点就会消失。②Master选举：
+ 
+   利用ZooKeeper的强一致性，能够保证在分布式高并发情况下节点创建的全局唯一性，即：同时有多个客户端请求创建 /currentMaster 节点，最终一定只有一个客户端请求能够创建成功。
+ 
+ （6）分布式队列：一种常规先进先出,另一种待队列成员集齐后执行。
