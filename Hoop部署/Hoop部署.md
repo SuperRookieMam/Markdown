@@ -1,7 +1,8 @@
 ###hadoop安装步骤
+#### 一、HDFS
  1. 创建hadoop用户
     * useradd -m hadoop -s /bin/bash    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// 创建hadoop用户
-    * passwd hadoop &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;创建了可以登陆的 hadoop 用户，并使用 /bin/bash 作为shell
+    * passwd hadoop &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 创建了可以登陆的 hadoop 用户，并使用 /bin/bash 作为shell
     * visudo 给hadoop赋权  等效于 vim /etc/sudoers
     
     ![](./1.png)
@@ -32,3 +33,25 @@
  4. 复制配置文件到所有的子节点下面<br/>
     ![](./7.png)
  5. 首次运行需要执行  hadoop namenode –format
+ 6. hadoop sbin 下启动 ../hadoop/sbin/start-dfs.sh
+ 7. http://10.10.0.55:9870 &nbsp;&nbsp; hdfs管理界面
+ 
+####二、YARN 任务平台
+ 1. 配置yarn-evn.sh 的java_home<br/>
+    ![](./8.png)
+ 2. 配置 mapred-site.xml<br/>
+    ![](./9.png)
+ 3. 配置yarn-site.xml <br/>
+    ![](./10.png)
+ 4. 启动yarn 查看 http://10.10.0.55:8042/node 管理平台是否正常
+####三、spark 部署
+ 1. 下载spark wget +下载地址注意spark 版本严格限制注意和hadoop的版本对应关系
+ 2. 解压下载的spark 包
+ 3. 配置spark环境参数 复制conf 下 spark-env.sh.template 为 spark-env.sh 配置如下<br/>
+  ![](./11.png)
+ 4. 配置结点信息 复制conf 下 slaves.template 为 slaves 配置如下<br/>
+  ![](./12.png)
+ 5. 配置好的spark 文件加复制到节点机子上
+ 6. 启动测试spark 是否安装完成 
+####Flume安装
+    

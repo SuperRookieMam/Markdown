@@ -21,4 +21,6 @@ centos7修改主机名
 * vim /etc/hosts<br/>
 ![](./1.png)
 
+给所有的用户赋读写执行权限
+* chmod  -R a+w /usr/local/hadoop 
 
