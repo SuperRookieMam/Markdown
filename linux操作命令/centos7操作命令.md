@@ -24,3 +24,17 @@ centos7修改主机名
 给所有的用户赋读写执行权限
 * chmod  -R a+w /usr/local/hadoop 
 
+linux创服务
+ * ln  -s /usr/local/kafaka/bin/xxxxx.jar  /etc/init.d/xxx 创建软连接倒init.d
+ * chmod 777 xxx 修改文件权限
+ * systemctl enable xxx 添加软连接倒服务
+后台启动服务
+    nohup 
+    your_command > /dev/null 2>&1 &
+    
+    1)、nohup：表示所属终端关闭后，进程不会死掉； 
+    2)、> /dev/null ：标准输出重定向到 /dev/null (a dummy device that does not record any output). 
+    3)、2>&1 ：标准出错重定向到标准输出，也到/dev/null 
+    4)、最后的& ：后台任务 
+
+

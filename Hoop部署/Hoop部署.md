@@ -53,5 +53,68 @@
   ![](./12.png)
  5. 配置好的spark 文件加复制到节点机子上
  6. 启动测试spark 是否安装完成 
-####Flume安装
+####Flume安
+  * wget 下载
+  * 配置vim flume-env.sh<br/>
+  ![](./15.png)
+  * 配置 vim flume-conf.properties<br/> 
+  ![](./16.png)
+  
+  
+    #Flume系统中核心的角色是agent，agent本身是一个Java进程，一般运行在日志收集节点。
+    #每一个agent相当于一个数据传递员，内部有三个组件：
+        Source：采集源，用于跟数据源对接，以获取数据；
+        Sink：下沉地，采集数据的传送目的，用于往下一级agent传递数据或者往最终存储系统传递数据；
+        Channel：agent内部的数据传输通道，用于从source将数据传递到sink；
     
+    #在整个数据的传输的过程中，流动的是event，它是Flume内部数据传输的最基本单元。event将传输的数据进行封装。
+     如果是文本文件，通常是一行记录，event也是事务的基本单位。event从source，流向channel，
+     再到sink，本身为一个字节数组，并可携带headers(头信息)信息。event代表着一个数据的最小完整单元，
+     从外部数据源来，向外部的目的地去。
+    
+    #一个完整的event包括：event headers、event body、event信息，其中event信息就是flume收集到的日记记录。
+    
+    # 定义一个agent格式如下
+    #定义这个agent中各组件的名字
+    test.sources = testSources
+    test.channels = testChannel
+    test.sinks = testSink
+    
+    #描述和配置source组件：testSources
+    # 监听文件夹配置如下
+    # test.sources.testSources.type = spooldir
+    # test.sources.testSources.spoolDir = /logs
+    # 监听端口如下
+    test.sources.testSources.type = netcat
+    test.sources.testSources.bind = node-2
+    test.sources.testSources.port = 44444
+    
+    # sink到kafka里面
+    test.sinks.testSink.channel = testChannel
+    test.sinks.testSink.type =org.apache.flume.sink.kafka.KafkaSink
+    #设置Kafka的Topic
+    test.sinks.testSink.kafka.topic = test
+    #设置Kafka的broker地址和端口号
+    test.sinks.testSink.kafka.bootstrap.servers = node-2:9092
+    #配置批量提交的数量
+    test.sinks.testSink.kafka.flumeBatchSize = 20
+    test.sinks.testSink.kafka.producer.acks = 1
+    test.sinks.testSink.kafka.producer.linger.ms = 1
+    test.sinks.testSink.kafka.producer.compression.type= snappy
+                
+    #对于channel的配置描述 使用文件做数据的临时缓存 这种的安全性要高
+    test.channels.testChannel.type = file
+    test.channels.testChannel.checkpointDir = /usr/local/flume/checkpoint
+    test.channels.testChannel.dataDirs = /usr/local/flume/data
+    
+    #通过channel c1将source testSources和sink testSink关联起来
+    test.sources.testSources.channels = testChannel
+    test.sinks.testSink.channel = testChannel
+  
+#### kafaka 安装
+  1. wget 下载
+  2. 配置server.property<br/>
+  ![](./13.png)
+  ![](./14.png)
+  3. 启动zookeeper： nohup ./zookeeper-server-start.sh ../config/zookeeper.properties & 
+  4. 启动kafaka ：./kafka-server-start.sh -daemon ../config/server.properties
